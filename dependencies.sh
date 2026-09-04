@@ -141,6 +141,10 @@ elif [ "$OS" = "centos" ] || [ "$OS" = "rhel" ] || [ "$OS" = "rocky" ] || [ "$OS
     yum clean all
     yum makecache
     check_success "Failed to update package lists"
+elif [ "$OS" = "kylin" ]; then
+    yum clean all
+    yum makecache
+    check_success "Failed to update package lists"
 else
     print_error "Unsupported OS: $OS"
 fi
@@ -216,6 +220,41 @@ elif [ "$OS" = "centos" ] || [ "$OS" = "rhel" ] || [ "$OS" = "rocky" ] || [ "$OS
                      libbsd-devel"
 
     yum install -y $SYSTEM_PACKAGES
+    check_success "Failed to install system packages"
+
+elif [ "$OS" = "kylin" ]; then
+    SYSTEM_PACKAGES="@development \
+                     cmake \
+                     ninja-build \
+                     git \
+                     wget \
+                     rdma-core-devel \
+                     glog-devel \
+                     gflags-devel \
+                     jsoncpp-devel \
+                     libunwind-devel \
+                     numactl-devel \
+                     python3-devel \
+                     boost-devel \
+                     openssl-devel \
+                     protobuf-devel \
+                     yaml-cpp-devel \
+                     libcurl-devel \
+                     hiredis-devel \
+                     liburing-devel \
+                     jemalloc-devel \
+                     msgpack-devel \
+                     libzstd-devel \
+                     pkgconf-pkg-config \
+                     elfutils-libelf-devel \
+                     patchelf  \
+                     xxhash-devel \
+                     libbsd-devel"
+
+    KYLIN_EPKL_RELEASE=${KYLIN_EPKL_RELEASE:-2503}
+    KYLIN_EPKL_URL="${KYLIN_EPKL_URL:-https://eps-server.openkylin.top/NS/V11/${KYLIN_EPKL_RELEASE}/EPKL/main/$(uname -m)/}"
+    dnf --repofrompath="kylin-epkl,$KYLIN_EPKL_URL" \
+        --enablerepo=kylin-epkl install -y $SYSTEM_PACKAGES
     check_success "Failed to install system packages"
 else
     print_error "Unsupported OS: $OS"
