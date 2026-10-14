@@ -10,7 +10,7 @@
 # build output. PG_CORE_SO_PATH: absolute path to the built libmooncake_pg.so.
 # PG_DEVICE_SO_PATH: absolute path to libmooncake_pg_device.so. EP_USE_MUSA: set
 # to "1" for the MUSA/MTLink path. EP_USE_MACA: set to "1" for the MACA/MTLink
-# path.
+# path. EP_USE_HYGON selects DTK's CUDA compatibility toolkit.
 
 cmake_minimum_required(VERSION 3.16)
 
@@ -31,6 +31,12 @@ endif()
 # descriptors".
 set(ENV{MAKEFLAGS} "")
 set(ENV{MFLAGS} "")
+if(EP_C_COMPILER)
+  set(ENV{CC} "${EP_C_COMPILER}")
+endif()
+if(EP_CXX_COMPILER)
+  set(ENV{CXX} "${EP_CXX_COMPILER}")
+endif()
 if(NOT PG_CORE_SO_PATH OR NOT EXISTS "${PG_CORE_SO_PATH}")
   message(
     FATAL_ERROR
@@ -60,6 +66,15 @@ if(EP_USE_MACA)
   endif()
 else()
   unset(ENV{MOONCAKE_EP_USE_MACA})
+endif()
+if(EP_USE_HYGON)
+  set(ENV{CUDA_HOME} "${EP_DTK_CUDA_ROOT}")
+  set(ENV{CUDA_PATH} "${EP_DTK_CUDA_ROOT}")
+  set(ENV{MOONCAKE_EP_USE_HYGON} "1")
+  set(EP_CUDA_MAJOR "${EP_DTK_CUDA_MAJOR}")
+  set(EP_CUDA_MINOR "${EP_DTK_CUDA_MINOR}")
+else()
+  unset(ENV{MOONCAKE_EP_USE_HYGON})
 endif()
 
 # ---------------------------------------------------------------------------

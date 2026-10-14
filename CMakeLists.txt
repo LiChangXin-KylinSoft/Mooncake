@@ -179,6 +179,10 @@ if(WITH_EP)
     if(USE_CUDA)
       find_package(CUDAToolkit REQUIRED)
       message(STATUS "Detected CUDA version: ${CUDAToolkit_VERSION}")
+    elseif(USE_HYGON)
+      # DTK exposes CUDA-compatible headers and libraries but must be compiled
+      # with its own nvcc wrapper rather than CMake's NVIDIA CUDA frontend.
+      message(STATUS "Detected Hygon DTK CUDA compatibility toolkit: ${DTK_CUDA_ROOT}")
     endif()
 
     add_subdirectory(mooncake-ep)
@@ -212,10 +216,10 @@ if(WITH_EP)
     endif()
 
     # TORCH_CUDA_ARCH_LIST forwarded to the torch CUDA extension build.
-    if(NOT TORCH_CUDA_ARCH_LIST)
+    if(NOT TORCH_CUDA_ARCH_LIST AND NOT USE_HYGON)
       set(TORCH_CUDA_ARCH_LIST "$ENV{TORCH_CUDA_ARCH_LIST}")
     endif()
-    if(NOT TORCH_CUDA_ARCH_LIST)
+    if(NOT TORCH_CUDA_ARCH_LIST AND NOT USE_HYGON)
       if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
         set(TORCH_CUDA_ARCH_LIST "8.0;9.0;10.3")
       else()
@@ -242,15 +246,19 @@ if(WITH_EP)
     string(REPLACE ";" "|" _ep_torch_versions_pipe "${EP_TORCH_VERSIONS}")
     string(REPLACE ";" "|" _torch_cuda_arch_list_pipe "${TORCH_CUDA_ARCH_LIST}")
 
-    if(USE_CUDA)
+    if(USE_CUDA OR USE_HYGON)
       add_custom_target(
         mooncake_ep_device_stage ALL
         COMMAND ${CMAKE_COMMAND} -E make_directory "${EP_PG_STAGING_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:mooncake_ep_device>" "${EP_PG_STAGING_DIR}/"
-        COMMENT "Staging Mooncake EP CUDA device library"
+        COMMENT "Staging Mooncake EP device library"
         DEPENDS mooncake_ep_device
         VERBATIM)
+      # `_ep` is frequently built explicitly before a component-only install.
+      # Keep the staged device library in sync in that workflow; otherwise the
+      # install step can pair a newly linked `_ep` with a stale device DSO.
+      add_dependencies(_ep mooncake_ep_device_stage)
     endif()
 
     add_custom_target(
@@ -261,13 +269,19 @@ if(WITH_EP)
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/mooncake-pg/torch"
         "-DEP_CUDA_MAJOR=${CUDAToolkit_VERSION_MAJOR}"
         "-DEP_CUDA_MINOR=${CUDAToolkit_VERSION_MINOR}"
+        "-DEP_DTK_CUDA_MAJOR=${DTK_CUDA_VERSION_MAJOR}"
+        "-DEP_DTK_CUDA_MINOR=${DTK_CUDA_VERSION_MINOR}"
+        "-DEP_DTK_CUDA_ROOT=${DTK_CUDA_ROOT}"
         "-DEP_TORCH_VERSIONS=${_ep_torch_versions_pipe}"
         "-DSTAGING_DIR=${EP_PG_STAGING_DIR}" "-DBUILD_DIR=${EP_PG_BUILD_DIR}"
         "-DPG_CORE_SO_PATH=$<TARGET_FILE:mooncake_pg>"
         "-DPG_DEVICE_SO_PATH=$<TARGET_FILE:mooncake_pg_device>"
         "-DPython3_EXECUTABLE=${Python3_EXECUTABLE}"
+        "-DEP_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DEP_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
         "-DEP_USE_MUSA=$<IF:$<BOOL:${USE_MUSA}>,1,0>"
-        "-DEP_USE_MACA=$<IF:$<BOOL:${USE_MACA}>,1,0>" -P
+        "-DEP_USE_MACA=$<IF:$<BOOL:${USE_MACA}>,1,0>"
+        "-DEP_USE_HYGON=$<IF:$<BOOL:${USE_HYGON}>,1,0>" -P
         "${CMAKE_CURRENT_SOURCE_DIR}/mooncake-pg/torch/BuildPgExt.cmake"
       COMMENT "Building Mooncake PG Python extension(s)"
       DEPENDS mooncake_pg mooncake_pg_device

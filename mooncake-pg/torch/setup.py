@@ -44,6 +44,11 @@ cxx_args = [
     "-std=c++20",
     "-O3",
     "-g0",
+    # glog >= 0.7 requires consumers of its CMake-built shared library to
+    # include the generated export declarations. The top-level CMake build
+    # defines this globally, but torch.utils.cpp_extension runs as a separate
+    # build and does not inherit directory compile definitions.
+    "-DGLOG_USE_GLOG_EXPORT",
 ]
 
 include_dirs = [os.path.join(current_dir, "include")]
@@ -55,6 +60,12 @@ use_maca = (
     os.getenv("MOONCAKE_EP_USE_MACA", "").upper() in {"1", "ON", "TRUE", "YES"}
     or (hasattr(torch.version, "maca") and torch.version.maca is not None)
 )
+use_hygon = os.getenv("MOONCAKE_EP_USE_HYGON", "").upper() in {
+    "1",
+    "ON",
+    "TRUE",
+    "YES",
+}
 
 if use_musa:
     musa_defines = ["-DUSE_MUSA", "-DMOONCAKE_EP_USE_MUSA=1"]
@@ -68,6 +79,8 @@ else:
     include_dirs += shared_include_dirs
     if use_maca:
         cxx_args += ["-DUSE_MACA", "-DMOONCAKE_EP_USE_MACA=1"]
+    elif use_hygon:
+        cxx_args += ["-DUSE_HYGON", "-DMOONCAKE_EP_USE_HYGON=1"]
 
 setup(
     name=module_name,
